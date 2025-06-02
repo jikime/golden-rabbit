@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu'
 import { useAuth } from '@/hooks/use-auth'
-import { User, LogOut, Settings, LogIn } from 'lucide-react'
+import { User, LogOut, Settings, LogIn, Rocket } from 'lucide-react'
 
 export function Header() {
   const { user, isAuthenticated, logout, isLoading } = useAuth()
@@ -18,28 +18,21 @@ export function Header() {
   return (
     <header className="border-b bg-background">
       <div className="container flex items-center justify-between h-16 px-4">
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-2">
           <Link href="/" className="flex items-center gap-2">
-            <span className="text-xl font-bold">AI 챗봇</span>
+            <Rocket className="h-5 w-5" />
+            <span className="text-xl font-bold">나만의 비서</span>
           </Link>
-          <nav className="hidden md:flex gap-4">
-            <Link 
-              href="/" 
-              className="text-sm font-medium hover:underline underline-offset-4"
-            >
-              홈
-            </Link>
-            {isAuthenticated && (
-              <Link 
-                href="/chat" 
-                className="text-sm font-medium hover:underline underline-offset-4"
-              >
-                채팅
-              </Link>
-            )}
-          </nav>
         </div>
         <div className="flex items-center gap-4">
+          <nav className="flex gap-3">
+            <Button asChild variant="ghost" size="sm">
+              <Link href="/">AI 채팅</Link>
+            </Button>
+            <Button asChild variant="ghost" size="sm">
+              <Link href="/todo">할 일 목록</Link>
+            </Button>
+          </nav>
           {isLoading ? (
             <div className="text-sm text-muted-foreground">로딩 중...</div>
           ) : isAuthenticated ? (

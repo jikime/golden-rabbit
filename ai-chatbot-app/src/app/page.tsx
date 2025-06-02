@@ -1,14 +1,16 @@
-import { ChatInterface } from "@/components/chat/chat-interface"
-import { SidebarProvider } from "@/components/ui/sidebar"
-import { requireAuth } from "@/lib/server-auth"
+import { ChatSidebar } from "@/components/chat-sidebar"
+import ChatInterface from "@/components/chat-interface"
+import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar"
 
-export default async function Home() {
-  // 인증된 사용자만 접근 가능
-  await requireAuth()
-  
+export default function ChatPage() {
   return (
     <SidebarProvider>
-      <ChatInterface />
+      <div className="flex h-screen w-full">
+        <ChatSidebar />
+        <SidebarInset className="flex-1">
+          <ChatInterface />
+        </SidebarInset>
+      </div>
     </SidebarProvider>
   )
 }

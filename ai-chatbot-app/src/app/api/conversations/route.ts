@@ -1,72 +1,50 @@
-import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase-client';
-import { getCurrentUser, createAuthError } from '@/lib/server-auth';
+import { NextResponse } from 'next/server'
+import { supabase } from '@/lib/supabase-client'
 
-// GET: 사용자의 모든 대화 가져오기
+// GET: 대화 목록 조회
 export async function GET() {
   try {
-    // 사용자 인증 확인
-    const user = await getCurrentUser();
-    
-    if (!user || !user.id) {
-      return createAuthError();
-    }
-    
-    // 사용자의 대화 목록 가져오기
     const { data, error } = await supabase
       .from('conversations')
       .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
     
     if (error) {
-      throw error;
+      return NextResponse.json({ error: error.message }, { status: 500 })
     }
-    
-    return NextResponse.json({ conversations: data });
+
+    return NextResponse.json(data)
   } catch (error) {
-    console.error('대화 목록 조회 오류:', error);
+    console.error('Error fetching conversations:', error)
     return NextResponse.json(
       { error: '대화 목록을 불러오는 중 오류가 발생했습니다.' },
       { status: 500 }
-    );
+    )
   }
 }
 
 // POST: 새 대화 생성
-export async function POST(req: Request) {
+export async function POST(request: Request) {
   try {
-    // 사용자 인증 확인
-    const user = await getCurrentUser();
+    const body = await request.json()
+    const title = body.title || '새 대화'
     
-    if (!user || !user.id) {
-      return createAuthError();
-    }
-    
-    // 요청 본문에서 제목 가져오기
-    const { title = '새 대화' } = await req.json();
-    
-    // 새 대화 생성
     const { data, error } = await supabase
       .from('conversations')
-      .insert([
-        { 
-          title, 
-          user_id: user.id 
-        }
-      ])
-      .select();
+      .insert([{ title }])
+      .select()
+      .single()
     
     if (error) {
-      throw error;
+      return NextResponse.json({ error: error.message }, { status: 500 })
     }
     
-    return NextResponse.json({ conversation: data[0] });
+    return NextResponse.json(data)
   } catch (error) {
-    console.error('대화 생성 오류:', error);
+    console.error('Error creating conversation:', error)
     return NextResponse.json(
       { error: '새 대화를 생성하는 중 오류가 발생했습니다.' },
       { status: 500 }
-    );
+    )
   }
 } 
