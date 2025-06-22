@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server"
 import { supabase } from "@/lib/supabase-client"
-
-// 임시 사용자 ID
-const TEMP_USER_ID = "6f984bf4-59da-4758-a8c2-e86ccdb2fe6e"
+import { getUserIdFromSession } from "@/lib/server-auth"
 
 // 파일 유효성 검사를 위한 상수
 const MAX_FILE_SIZE = 3 * 1024 * 1024 // 3MB
@@ -11,6 +9,12 @@ const VALID_FILE_TYPES = ["image/jpeg", "image/png", "image/gif"]
 export async function GET() {
   try {
     console.log("GET /api/instagram - Starting to fetch posts with comments and likes")
+
+    // 사용자 인증 확인
+    const userId = await getUserIdFromSession()
+    if (!userId) {
+      return NextResponse.json({ error: "인증이 필요합니다." }, { status: 401 })
+    }
 
     // posts, comments, likes를 함께 조회
     const { data: posts, error } = await supabase
@@ -51,7 +55,7 @@ export async function GET() {
             (a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
           ) || [],
         likes_count: post.likes?.length || 0,
-        is_liked: post.likes?.some((like: any) => like.user_id === TEMP_USER_ID) || false,
+        is_liked: post.likes?.some((like: any) => like.user_id === userId) || false,
       })) || []
 
     console.log(`Successfully fetched ${postsWithProcessedData.length} posts with comments and likes`)
@@ -73,6 +77,12 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     console.log("POST /api/instagram - Starting image upload")
+
+    // 사용자 인증 확인
+    const userId = await getUserIdFromSession()
+    if (!userId) {
+      return NextResponse.json({ error: "인증이 필요합니다." }, { status: 401 })
+    }
 
     // 1. 데이터 수신 - FormData 형태로 전송된 요청 받기
     const formData = await request.formData()
@@ -144,7 +154,7 @@ export async function POST(request: Request) {
     const { data: postData, error: dbError } = await supabase
       .from("posts")
       .insert({
-        user_id: TEMP_USER_ID,
+        user_id: userId,
         image_url: imageUrl,
         caption: caption || null,
       })

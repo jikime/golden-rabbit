@@ -1,9 +1,16 @@
 import { NextResponse } from "next/server"
 import { supabase } from "@/lib/supabase-client"
+import { getUserIdFromSession } from "@/lib/server-auth"
 
 export async function POST(request: Request) {
   try {
     console.log("POST /api/instagram/comments - Starting comment creation")
+
+    // 사용자 인증 확인
+    const userId = await getUserIdFromSession()
+    if (!userId) {
+      return NextResponse.json({ error: "인증이 필요합니다." }, { status: 401 })
+    }
 
     // 요청 본문에서 데이터 추출
     const body = await request.json()
@@ -37,15 +44,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "존재하지 않는 게시물입니다." }, { status: 404 })
     }
 
-    // 임시로 고정된 user_id 사용 (실제로는 인증된 사용자 ID 사용)
-    const tempUserId = "6f984bf4-59da-4758-a8c2-e86ccdb2fe6e"
-
     // comments 테이블에 새 댓글 삽입
     const { data: commentData, error: insertError } = await supabase
       .from("comments")
       .insert({
         post_id: post_id,
-        user_id: tempUserId,
+        user_id: userId,
         content: content.trim(),
       })
       .select()

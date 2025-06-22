@@ -32,6 +32,9 @@ export function Header() {
             <Button asChild variant="ghost" size="sm">
               <Link href="/todo">할 일 목록</Link>
             </Button>
+            <Button asChild variant="ghost" size="sm">
+              <Link href="/instagram">인스타그램</Link>
+            </Button>
           </nav>
           {isLoading ? (
             <div className="text-sm text-muted-foreground">로딩 중...</div>

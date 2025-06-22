@@ -5,6 +5,7 @@ import type React from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { useState, useRef } from "react"
+import { toast } from "sonner"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
@@ -74,6 +75,7 @@ export default function PostCard({
   // 삭제 관련 상태
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [isDeleted, setIsDeleted] = useState(false) // 낙관적 UI 업데이트를 위한 상태
 
   // 댓글 입력 필드 참조
   const commentInputRef = useRef<HTMLInputElement>(null)
@@ -96,6 +98,20 @@ export default function PostCard({
 
     setIsDeleting(true)
 
+    // 낙관적 UI 업데이트 - 모달 닫고 게시물 상태를 삭제됨으로 변경
+    setIsDeleteDialogOpen(false)
+    setIsDeleted(true)
+
+    // 부모 컴포넌트에 삭제 알림 (낙관적 업데이트)
+    if (onPostDeleted) {
+      onPostDeleted(id)
+    }
+
+    // 삭제 진행 중 토스트 표시
+    const toastId = toast.loading("게시물을 삭제하는 중...", {
+      duration: 5000,
+    })
+
     try {
       const response = await fetch(`/api/instagram/posts/${id}`, {
         method: "DELETE",
@@ -112,17 +128,31 @@ export default function PostCard({
       const result = await response.json()
       console.log("Post deleted successfully:", result)
 
-      // 성공 시 부모 컴포넌트에 삭제 완료 알림
-      if (onPostDeleted) {
-        onPostDeleted(id)
-      }
-
-      // 모달 닫기
-      setIsDeleteDialogOpen(false)
+      // 성공 토스트로 업데이트
+      toast.success("게시물이 삭제되었습니다.", {
+        id: toastId,
+        duration: 3000,
+      })
     } catch (error) {
       console.error("Delete error:", error)
       const errorMessage = error instanceof Error ? error.message : "게시물 삭제 중 오류가 발생했습니다."
-      alert(`삭제 실패: ${errorMessage}`)
+      
+      // 실패 토스트로 업데이트
+      toast.error(`삭제 실패: ${errorMessage}`, {
+        id: toastId,
+        duration: 5000,
+      })
+
+      // 낙관적 업데이트 롤백
+      setIsDeleted(false)
+      
+      // 부모 컴포넌트에 롤백 알림 (삭제 취소)
+      if (onPostDeleted) {
+        // 이 부분은 부모 컴포넌트에서 롤백 로직을 구현해야 함
+        // 여기서는 삭제 취소를 알리는 방식으로 구현
+        // 실제로는 부모 컴포넌트에서 이 경우를 처리하는 별도 콜백이 필요할 수 있음
+        toast.error("게시물 삭제에 실패했습니다. 페이지를 새로고침해 주세요.")
+      }
     } finally {
       setIsDeleting(false)
     }
@@ -180,7 +210,7 @@ export default function PostCard({
       setLikesCount(likesCount)
 
       const errorMessage = error instanceof Error ? error.message : "좋아요 처리 중 오류가 발생했습니다."
-      alert(`좋아요 실패: ${errorMessage}`)
+      toast.error(`좋아요 실패: ${errorMessage}`)
     } finally {
       setIsLikeProcessing(false)
     }
@@ -193,6 +223,19 @@ export default function PostCard({
 
     setIsSubmittingComment(true)
 
+    // 낙관적 업데이트를 위한 임시 댓글 ID 생성
+    const tempId = `temp-${Date.now()}`
+    const optimisticComment: Comment = {
+      id: tempId,
+      content: newComment.trim(),
+      created_at: new Date().toISOString(),
+      user_id: "current-user", // 실제 사용자 ID로 대체 필요
+    }
+
+    // 낙관적 업데이트 - UI에 먼저 댓글 추가
+    setLocalComments((prev) => [...prev, optimisticComment])
+    setNewComment("") // 입력 필드 초기화
+
     try {
       const response = await fetch("/api/instagram/comments", {
         method: "POST",
@@ -201,7 +244,7 @@ export default function PostCard({
         },
         body: JSON.stringify({
           post_id: id,
-          content: newComment.trim(),
+          content: optimisticComment.content,
         }),
       })
 
@@ -213,20 +256,30 @@ export default function PostCard({
       const result = await response.json()
       console.log("Comment created:", result)
 
-      // 새 댓글을 로컬 상태에 추가
-      const newCommentData: Comment = {
-        id: result.comment.id,
-        content: newComment.trim(),
-        created_at: result.comment.created_at,
-        user_id: result.comment.user_id,
-      }
-
-      setLocalComments((prev) => [...prev, newCommentData])
-      setNewComment("") // 입력 필드 초기화
+      // 임시 댓글을 실제 서버 응답으로 대체
+      setLocalComments((prev) =>
+        prev.map((comment) =>
+          comment.id === tempId
+            ? {
+                id: result.comment.id,
+                content: result.comment.content,
+                created_at: result.comment.created_at,
+                user_id: result.comment.user_id,
+              }
+            : comment
+        )
+      )
     } catch (error) {
       console.error("Comment submission error:", error)
+      
+      // 오류 발생 시 낙관적 업데이트 롤백 - 임시 댓글 제거
+      setLocalComments((prev) => prev.filter((comment) => comment.id !== tempId))
+      
       const errorMessage = error instanceof Error ? error.message : "댓글 작성 중 오류가 발생했습니다."
-      alert(`댓글 작성 실패: ${errorMessage}`)
+      toast.error(`댓글 작성 실패: ${errorMessage}`)
+      
+      // 입력 필드에 원래 내용 복원
+      setNewComment(optimisticComment.content)
     } finally {
       setIsSubmittingComment(false)
     }
@@ -256,6 +309,11 @@ export default function PostCard({
     } catch (e) {
       return ""
     }
+  }
+
+  // 게시물이 삭제된 상태면 아무것도 렌더링하지 않음
+  if (isDeleted) {
+    return null
   }
 
   return (

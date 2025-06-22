@@ -1,10 +1,17 @@
 import { NextResponse } from "next/server"
 import { supabase } from "@/lib/supabase-client"
+import { getUserIdFromSession } from "@/lib/server-auth"
 
 export async function DELETE(request: Request, { params }: { params: { id: string } }) {
   try {
     const postId = params.id
     console.log(`DELETE /api/instagram/posts/${postId} - Starting post deletion`)
+
+    // 사용자 인증 확인
+    const userId = await getUserIdFromSession()
+    if (!userId) {
+      return NextResponse.json({ error: "인증이 필요합니다." }, { status: 401 })
+    }
 
     // 유효성 검사
     if (!postId) {
@@ -25,6 +32,11 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
       }
       console.error("Post fetch error:", fetchError)
       return NextResponse.json({ error: `게시물 조회 실패: ${fetchError.message}` }, { status: 500 })
+    }
+
+    // 게시물 소유자 확인
+    if (post.user_id !== userId) {
+      return NextResponse.json({ error: "본인의 게시물만 삭제할 수 있습니다." }, { status: 403 })
     }
 
     console.log("Found post to delete:", { id: post.id, image_url: post.image_url })

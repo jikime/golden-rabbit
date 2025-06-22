@@ -1,18 +1,22 @@
 import { NextResponse } from "next/server"
 import { supabase } from "@/lib/supabase-client"
-
-// 임시 사용자 ID (실제로는 인증된 사용자 ID 사용)
-const TEMP_USER_ID = "6f984bf4-59da-4758-a8c2-e86ccdb2fe6e"
+import { getUserIdFromSession } from "@/lib/server-auth"
 
 export async function POST(request: Request) {
   try {
     console.log("POST /api/instagram/like - Adding like")
 
+    // 사용자 인증 확인
+    const userId = await getUserIdFromSession()
+    if (!userId) {
+      return NextResponse.json({ error: "인증이 필요합니다." }, { status: 401 })
+    }
+
     // 요청 본문에서 데이터 추출
     const body = await request.json()
     const { post_id } = body
 
-    console.log("Received like data:", { post_id, user_id: TEMP_USER_ID })
+    console.log("Received like data:", { post_id, user_id: userId })
 
     // 유효성 검사
     if (!post_id) {
@@ -36,7 +40,7 @@ export async function POST(request: Request) {
       .from("likes")
       .select("id")
       .eq("post_id", post_id)
-      .eq("user_id", TEMP_USER_ID)
+      .eq("user_id", userId)
       .single()
 
     if (likeCheckError && likeCheckError.code !== "PGRST116") {
@@ -54,7 +58,7 @@ export async function POST(request: Request) {
       .from("likes")
       .insert({
         post_id: post_id,
-        user_id: TEMP_USER_ID,
+        user_id: userId,
       })
       .select()
       .single()
@@ -92,11 +96,17 @@ export async function DELETE(request: Request) {
   try {
     console.log("DELETE /api/instagram/like - Removing like")
 
+    // 사용자 인증 확인
+    const userId = await getUserIdFromSession()
+    if (!userId) {
+      return NextResponse.json({ error: "인증이 필요합니다." }, { status: 401 })
+    }
+
     // 요청 본문에서 데이터 추출
     const body = await request.json()
     const { post_id } = body
 
-    console.log("Received unlike data:", { post_id, user_id: TEMP_USER_ID })
+    console.log("Received unlike data:", { post_id, user_id: userId })
 
     // 유효성 검사
     if (!post_id) {
@@ -108,7 +118,7 @@ export async function DELETE(request: Request) {
       .from("likes")
       .delete()
       .eq("post_id", post_id)
-      .eq("user_id", TEMP_USER_ID)
+      .eq("user_id", userId)
       .select()
       .single()
 

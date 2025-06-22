@@ -1,6 +1,7 @@
 import type React from "react"
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
+import { Toaster } from "sonner"
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { Header } from "@/components/header"
@@ -27,6 +28,7 @@ export default function RootLayout({
             <main>
               {children}
             </main>
+            <Toaster position="bottom-right" richColors />
           </ThemeProvider>
         </AuthProvider>
       </body>
