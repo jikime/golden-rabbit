@@ -20,6 +20,17 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Supabase 설정
+
+이 프로젝트는 Supabase를 사용합니다. 로컬 개발 환경에서 사용하기 위해 `.env.local` 파일을 생성하고 다음 환경 변수를 설정해야 합니다:
+
+```
+NEXT_PUBLIC_SUPABASE_URL=your-supabase-url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+```
+
+Supabase 프로젝트의 대시보드에서 이 값들을 확인할 수 있습니다.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

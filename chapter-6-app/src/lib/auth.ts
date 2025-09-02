@@ -1,128 +1,121 @@
-import { NextAuthOptions } from "next-auth";
-import GoogleProvider from "next-auth/providers/google";
-import CredentialsProvider from "next-auth/providers/credentials";
-import bcrypt from "bcrypt";
-import { supabase } from "./supabase-client";
-import { User } from "next-auth";
-import { Session } from "next-auth";
-
-// NextAuth User 타입 확장
-interface ExtendedUser extends User {
-  provider?: string;
-}
-
-// 세션 사용자 타입 확장
-interface ExtendedSession extends Session {
-  user: {
-    id: string;
-    name?: string | null;
-    email?: string | null;
-    image?: string | null;
-    provider?: string;
-  };
-  accessToken?: string;
-}
+import { NextAuthOptions } from "next-auth"
+import GoogleProvider from "next-auth/providers/google"
+import CredentialsProvider from "next-auth/providers/credentials"
+import { compare } from "bcrypt"
+import { supabase } from "./supabase-client"
 
 export const authOptions: NextAuthOptions = {
+  // 세션 관리 방식 설정 (JWT 사용)
+  session: {
+    strategy: "jwt",
+    maxAge: 30 * 24 * 60 * 60, // 30일
+  },
+  
+  // 페이지 경로 설정
+  pages: {
+    signIn: "/auth/signin",
+    signOut: "/auth/signout",
+    error: "/auth/error",
+  },
+  
+  // 인증 제공자 설정
   providers: [
+    // Google 로그인
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID || "",
       clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
+      profile(profile) {
+        return {
+          id: profile.sub,
+          name: profile.name,
+          email: profile.email,
+          image: profile.picture,
+        }
+      },
     }),
+    
+    // 이메일/비밀번호 로그인
     CredentialsProvider({
       name: "credentials",
       credentials: {
-        email: { label: "Email", type: "email" },
-        password: { label: "Password", type: "password" },
+        email: { label: "이메일", type: "email" },
+        password: { label: "비밀번호", type: "password" },
       },
       async authorize(credentials) {
-        // 1. email, password 받기
+        // 이메일과 비밀번호가 제공되었는지 확인
         if (!credentials?.email || !credentials?.password) {
-          return null;
+          throw new Error("이메일과 비밀번호를 입력해주세요.")
         }
 
         try {
-          // 2. supabase의 users 테이블에서 email로 사용자 조회
+          // Supabase에서 사용자 조회
           const { data: user, error } = await supabase
             .from("users")
             .select("*")
             .eq("email", credentials.email)
-            .single();
+            .single()
 
-          // 사용자가 없는 경우
+          // 사용자를 찾지 못한 경우
           if (error || !user) {
-            console.log("User not found:", credentials.email);
-            return null;
+            console.log("사용자를 찾을 수 없음:", credentials.email)
+            return null
           }
 
-          // 3. 비밀번호 검증
-          const isPasswordValid = await bcrypt.compare(
-            credentials.password,
-            user.password || ''
-          );
+          // 비밀번호 검증
+          const isPasswordValid = await compare(credentials.password, user.password)
 
-          // 4. 비밀번호가 일치하지 않는 경우
+          // 비밀번호가 일치하지 않는 경우
           if (!isPasswordValid) {
-            console.log("Invalid password for user:", credentials.email);
-            return null;
+            console.log("비밀번호 불일치:", credentials.email)
+            return null
           }
 
-          // 5. 모든 검증이 통과되면 사용자 정보 반환
+          // 인증 성공: 사용자 정보 반환
           return {
             id: user.id,
             name: user.name,
             email: user.email,
             image: user.image,
-            provider: user.provider,
-          };
+          }
         } catch (error) {
-          console.error("Authentication error:", error);
-          return null;
+          console.error("로그인 인증 중 오류 발생:", error)
+          return null
         }
       },
     }),
   ],
-  pages: {
-    signIn: "/auth/signin",
-    error: "/auth/error",
-  },
-  session: {
-    strategy: "jwt",
-    maxAge: 30 * 24 * 60 * 60, // 30 days
-  },
+  
+  // 콜백 함수 설정
   callbacks: {
-    // 1. signIn 콜백 함수: Google 로그인 처리
-    async signIn({ user, account, profile }) {
-      // Google Provider를 통한 로그인인 경우에만 처리
+    // signIn 콜백: 로그인 과정에서 추가 검증이나 처리를 수행
+    async signIn({ account, profile }) {
+      // Google 로그인인 경우에만 처리
       if (account?.provider === "google" && profile) {
         try {
-          // 이메일과 이름 가져오기
-          const email = profile.email;
-          const name = profile.name;
-          // Google OAuth profile의 타입은 OAuthUserProfile이므로 타입 단언 사용
-          const googleProfile = profile as { picture?: string };
-          const image = googleProfile.picture || "";
+          const email = profile.email
+          const name = profile.name
+          const image = profile.image
           
+          console.log("Google 로그인 시도:", { email, name })
+          
+          // 이메일이 없는 경우 로그인 거부
           if (!email) {
-            console.error("Google profile missing email");
-            return false;
+            console.error("Google 로그인 실패: 이메일 정보가 없습니다.")
+            return false
           }
           
-          // supabase에서 해당 이메일을 가진 사용자 확인
-          const { data: existingUser, error: userError } = await supabase
+          // Supabase에서 사용자 조회
+          const { data: existingUser, error: findError } = await supabase
             .from("users")
             .select("*")
             .eq("email", email)
-            .single();
-          
-          if (userError && userError.code !== 'PGRST116') { // PGRST116: 결과가 없음
-            console.error("Error checking existing user:", userError);
-            return false;
-          }
-          
-          // 사용자가 존재하지 않는 경우, 새로 생성
-          if (!existingUser) {
-            const { error: insertError } = await supabase
+            .single()
+            
+          // 사용자가 없는 경우 새로 생성
+          if (findError && findError.code === "PGRST116") {
+            console.log("새 사용자 등록:", email)
+            
+            const { data: newUser, error: createError } = await supabase
               .from("users")
               .insert([
                 {
@@ -130,90 +123,147 @@ export const authOptions: NextAuthOptions = {
                   name,
                   image,
                   provider: "google",
-                }
-              ]);
-            
-            if (insertError) {
-              console.error("Error creating user:", insertError);
-              return false;
+                },
+              ])
+              .select()
+              .single()
+              
+            if (createError) {
+              console.error("Google 사용자 등록 실패:", createError)
+              return false
             }
             
-            // 새로 생성된 사용자 정보 가져오기
-            const { data: newUser, error: fetchError } = await supabase
-              .from("users")
-              .select("*")
-              .eq("email", email)
-              .single();
-            
-            if (fetchError || !newUser) {
-              console.error("Error fetching new user:", fetchError);
-              return false;
-            }
-            
-            // user 객체에 ID 할당
-            (user as ExtendedUser).id = newUser.id;
+            console.log("Google 사용자 등록 성공:", newUser?.email)
+          } else if (findError) {
+            console.error("Google 사용자 조회 중 오류:", findError)
+            return false
           } else {
-            // 사용자가 이미 존재하는 경우, 프로필 정보 업데이트
-            const { error: updateError } = await supabase
-              .from("users")
-              .update({
-                name,
-                image,
-                provider: "google",
-              })
-              .eq("email", email);
-            
-            if (updateError) {
-              console.error("Error updating user:", updateError);
-              // 업데이트 실패해도 로그인은 허용
-            }
-            
-            // user 객체에 ID 할당
-            (user as ExtendedUser).id = existingUser.id;
+            console.log("기존 사용자 로그인:", existingUser?.email)
           }
+          
+          return true // 로그인 허용
         } catch (error) {
-          console.error("Error in Google sign in:", error);
-          return false;
+          console.error("Google 로그인 처리 중 오류:", error)
+          return false
         }
       }
       
-      return true;
+      // 다른 provider는 기본적으로 허용
+      return true
     },
     
-    // 2. jwt 콜백 함수: 토큰에 사용자 정보 저장
+    // JWT 콜백: 토큰 생성/업데이트 시 호출
     async jwt({ token, user, account }) {
-      if (user) {
-        token.id = user.id;
-        token.email = user.email;
-        token.name = user.name;
-        token.picture = user.image;
-        
-        // If using Google, store the access token
-        if (account?.provider === "google") {
-          token.accessToken = account.access_token;
-          token.provider = "google";
-        } else if ((user as ExtendedUser).provider) {
-          token.provider = (user as ExtendedUser).provider;
+      try {
+        // 사용자 정보가 있는 경우 (최초 로그인 또는 세션 갱신)
+        if (user) {
+          // 기본 사용자 정보를 토큰에 추가
+          token.id = user.id
+          token.email = user.email
+          
+          // Google 로그인인 경우
+          if (account?.provider === "google") {
+            // Supabase에서 사용자 정보 조회
+            const { data: dbUser, error } = await supabase
+              .from("users")
+              .select("id, email, name, image, provider")
+              .eq("email", user.email)
+              .single()
+              
+            if (error) {
+              console.error("JWT 생성 중 사용자 조회 오류:", error)
+              // 오류가 발생해도 기본 토큰은 유지
+              return token
+            }
+            
+            if (dbUser) {
+              // Supabase의 사용자 ID를 토큰에 저장
+              token.id = dbUser.id
+              token.dbEmail = dbUser.email // 데이터베이스에 저장된 이메일
+              token.dbName = dbUser.name // 데이터베이스에 저장된 이름
+              token.provider = dbUser.provider // 인증 제공자 정보
+            }
+          }
+          // Credentials 로그인인 경우 (이미 authorize에서 ID가 설정됨)
+          else if (account?.provider === "credentials") {
+            // 추가 정보가 필요한 경우 여기에 코드 추가
+            token.provider = "credentials"
+          }
         }
+        
+        return token
+      } catch (error) {
+        console.error("JWT 콜백 처리 중 오류:", error)
+        return token
       }
-      return token;
     },
     
-    // 3. session 콜백 함수: 세션에 사용자 정보 저장
+    // 세션 콜백: 클라이언트에 전달될 세션 객체 생성
     async session({ session, token }) {
-      if (token && session.user) {
-        session.user.id = token.id as string;
-        session.user.email = token.email as string;
-        session.user.name = token.name as string;
-        session.user.image = token.picture as string;
+      try {
+        // 토큰에서 세션으로 정보 복사
+        if (token && session.user) {
+          // 사용자 ID는 항상 포함
+          session.user.id = token.id as string
+          
+          // 데이터베이스에서 가져온 정보 우선 사용
+          if (token.dbEmail) {
+            session.user.email = token.dbEmail as string
+          }
+          
+          if (token.dbName) {
+            session.user.name = token.dbName as string
+          }
+          
+          // 인증 제공자 정보 추가
+          session.user.provider = token.provider as string
+          
+          // 디버깅용 로그
+          console.log("세션 생성:", {
+            id: session.user.id,
+            email: session.user.email,
+            provider: session.user.provider
+          })
+        }
         
-        // 타입 안전하게 provider 속성 추가
-        (session.user as any).provider = token.provider as string;
-        (session as any).accessToken = token.accessToken as string;
+        return session
+      } catch (error) {
+        console.error("세션 콜백 처리 중 오류:", error)
+        return session
       }
-      return session;
     },
   },
-  secret: process.env.NEXTAUTH_SECRET,
+  
+  // 디버그 모드 (개발 환경에서만 활성화)
   debug: process.env.NODE_ENV === "development",
-}; 
+}
+
+// NextAuth 타입 확장
+declare module "next-auth" {
+  interface User {
+    id: string
+    name?: string | null
+    email?: string | null
+    image?: string | null
+    provider?: string
+  }
+  
+  interface Session {
+    user: {
+      id: string
+      name?: string | null
+      email?: string | null
+      image?: string | null
+      provider?: string
+    }
+  }
+}
+
+declare module "next-auth/jwt" {
+  interface JWT {
+    id: string
+    dbEmail?: string
+    dbName?: string
+    provider?: string
+  }
+} 

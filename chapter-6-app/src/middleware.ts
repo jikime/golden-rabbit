@@ -1,47 +1,75 @@
-import { NextResponse } from "next/server";
-import { NextRequest } from "next/server";
-import { getToken } from "next-auth/jwt";
+import { NextRequest, NextResponse } from "next/server"
+import { getToken } from "next-auth/jwt"
+
+// 보호할 경로 목록
+const protectedRoutes = ["/"]
+
+// API 보호 경로 목록
+const protectedApiRoutes = [
+  "/api/chat",
+  "/api/conversations",
+]
+
+// 인증이 필요하지 않은 경로 목록
+const publicRoutes = [
+  "/auth/signin",
+  "/auth/signup",
+  "/auth/error",
+  "/api/auth",
+]
 
 export async function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+  const { pathname } = request.nextUrl
   
-  // Check if the path requires authentication
-  const isApiAuthRoute = pathname.startsWith("/api/auth");
-  const isAuthRoute = pathname.startsWith("/auth");
-  const isApiRoute = pathname.startsWith("/api");
-  
-  // Skip authentication check for auth routes
-  if (isApiAuthRoute || isAuthRoute) {
-    return NextResponse.next();
+  // 공개 경로는 항상 접근 허용
+  if (publicRoutes.some(route => pathname.startsWith(route))) {
+    return NextResponse.next()
   }
   
-  // Get the token
+  // JWT 토큰 확인
   const token = await getToken({
     req: request,
     secret: process.env.NEXTAUTH_SECRET,
-  });
+  })
   
-  // Redirect to sign in if accessing the home page without authentication
-  if (pathname === "/" && !token) {
-    const url = new URL("/auth/signin", request.url);
-    return NextResponse.redirect(url);
+  // API 경로 보호
+  if (protectedApiRoutes.some(route => pathname.startsWith(route))) {
+    // 인증되지 않은 사용자의 API 접근 차단
+    if (!token) {
+      return new NextResponse(
+        JSON.stringify({ success: false, message: "인증이 필요합니다." }),
+        { status: 401, headers: { "Content-Type": "application/json" } }
+      )
+    }
+    return NextResponse.next()
   }
   
-  // Return 401 for API routes that require authentication
-  if (isApiRoute && !token) {
-    if (pathname.startsWith("/api/chat") || pathname.startsWith("/api/conversations")) {
-      return new NextResponse(
-        JSON.stringify({ error: "Authentication required" }),
-        { status: 401, headers: { "content-type": "application/json" } }
-      );
+  // 보호된 페이지 경로 처리
+  if (protectedRoutes.includes(pathname)) {
+    // 인증되지 않은 사용자를 로그인 페이지로 리다이렉트
+    if (!token) {
+      const url = new URL("/auth/signin", request.url)
+      url.searchParams.set("callbackUrl", encodeURI(request.url))
+      return NextResponse.redirect(url)
     }
   }
   
-  return NextResponse.next();
+  return NextResponse.next()
 }
 
+// 미들웨어가 적용될 경로 설정
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    /*
+     * 다음 경로에 미들웨어 적용:
+     * - 루트 경로 (/)
+     * - /api/chat으로 시작하는 모든 경로
+     * - /api/conversations으로 시작하는 모든 경로
+     * - /auth로 시작하는 모든 경로 (인증 관련 페이지)
+     */
+    "/",
+    "/api/chat/:path*",
+    "/api/conversations/:path*",
+    "/auth/:path*",
   ],
-}; 
+} 

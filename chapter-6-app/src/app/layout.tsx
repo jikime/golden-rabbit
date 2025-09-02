@@ -4,13 +4,14 @@ import { Inter } from "next/font/google"
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { Header } from "@/components/header"
-import { AuthProvider } from "@/providers/auth-provider"
+import { AuthProvider } from "@/components/auth-provider"
+import { Toaster } from "sonner"
 
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "AI 채팅 앱",
-  description: "Next.js와 shadcn/ui로 만든 AI 채팅 애플리케이션",
+  title: "AI Chat",
+  description: "AI 챗봇 서비스",
 }
 
 export default function RootLayout({
@@ -23,8 +24,13 @@ export default function RootLayout({
       <body className={inter.className}>
         <AuthProvider>
           <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-            <Header />
-            {children}
+            <div className="flex min-h-screen flex-col">
+              <Header />
+              <main className="flex-1">
+                {children}
+              </main>
+            </div>
+            <Toaster />
           </ThemeProvider>
         </AuthProvider>
       </body>
