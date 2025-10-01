@@ -1,14 +1,13 @@
-import { NextResponse } from 'next/server';
-import supabase, { Todo } from '@/lib/supabase-client';
+import { NextRequest, NextResponse } from 'next/server';
+import { supabase } from '@/lib/supabase-client';
 
 /**
- * GET 요청을 처리하는 함수
- * 모든 할 일 목록을 반환합니다.
+ * GET 요청 처리 함수
+ * 할 일 목록을 가져옵니다.
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    // Supabase에서 todos 테이블의 모든 데이터를 가져옵니다.
-    // created_at 기준으로 최신순(내림차순) 정렬
+    // Supabase에서 할 일 목록 가져오기
     const { data, error } = await supabase
       .from('todos')
       .select('*')
@@ -19,15 +18,19 @@ export async function GET() {
     }
     
     return NextResponse.json({ 
-      success: true, 
-      message: '할 일 목록을 가져왔습니다.', 
-      data 
-    });
+      success: true,
+      todos: data,
+      count: data.length
+    }, { status: 200 });
   } catch (error) {
-    console.error('할 일 목록을 가져오는 중 오류가 발생했습니다:', error);
+    console.error('할 일 목록을 가져오는 중 오류 발생:', error);
     return NextResponse.json(
-      { success: false, message: '할 일 목록을 가져오는 중 오류가 발생했습니다.' },
+      { 
+        success: false, 
+        error: '할 일 목록을 가져오는 중 오류가 발생했습니다.' 
+      },
       { status: 500 }
     );
   }
 }
+
