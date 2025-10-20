@@ -5,9 +5,8 @@ import { z } from "zod"
  */
 export const loginSchema = z.object({
   email: z
-    .string()
-    .min(1, { message: "이메일을 입력해주세요." })
-    .email({ message: "유효한 이메일 주소를 입력해주세요." }),
+    .email({ message: "유효한 이메일 주소를 입력해주세요." })
+    .min(1, { message: "이메일을 입력해주세요." }),
   password: z
     .string()
     .min(1, { message: "비밀번호를 입력해주세요." }),
@@ -49,9 +48,8 @@ export const signupSchema = z
       .min(1, { message: "이름을 입력해주세요." })
       .max(50, { message: "이름은 최대 50자까지 가능합니다." }),
     email: z
-      .string()
-      .min(1, { message: "이메일은 필수 입력 항목입니다." })
-      .email({ message: "올바른 이메일 형식이 아닙니다." }),
+      .email({ message: "올바른 이메일 형식이 아닙니다." })
+      .min(1, { message: "이메일은 필수 입력 항목입니다." }),
     password: z
       .string()
       .min(6, { message: "비밀번호는 최소 6글자 이상이어야 합니다." }),

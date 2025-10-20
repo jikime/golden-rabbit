@@ -49,15 +49,13 @@ export async function POST(req: NextRequest) {
   try {
     // 요청 본문에서 데이터 추출
     const body = await req.json()
-    console.log(body)
     
     // 데이터 유효성 검사
     const result = registerSchema.safeParse(body)
-    console.log(result)
     
     // 유효성 검사 실패 시
     if (!result.success) {
-      const errorMessages = result.error.errors.map(error => {
+      const errorMessages = result.error.issues.map(error => {
         return {
           path: error.path.join('.'),
           message: error.message

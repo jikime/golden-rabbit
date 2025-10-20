@@ -191,15 +191,10 @@ export function useAuth() {
         }
 
         // 회원가입 성공 후 자동 로그인
-        return await login(
-          {
-            email: data.email,
-            password: data.password,
-          },
-          undefined,
-          "credentials",
-          "/"
-        )
+        return {
+          success: true,
+          message: "회원가입에 성공했습니다."
+        };
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : "회원가입 중 오류가 발생했습니다.";
         setError(errorMessage)

@@ -37,46 +37,26 @@ export default function SignUpPage() {
 
   const onSubmit = async (data: SignupFormData) => {
     try {
-      const response = await fetch("/api/register", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: data.name,
-          email: data.email,
-          password: data.password,
-        }),
+      const result = await registerUser({
+        name: data.name,
+        email: data.email,
+        password: data.password,
+        confirmPassword: data.confirmPassword,
       })
-
-      const result = await response.json()
-
-      if (!response.ok) {
-        // API 에러 처리
-        if (result.message.includes("이미 사용 중인 이메일")) {
-          setError("email", { 
-            type: "manual", 
-            message: "이미 사용 중인 이메일입니다." 
-          })
-        } else {
-          // 다른 에러 메시지 처리
-          setError("root", { 
-            type: "manual", 
-            message: result.message || "회원가입에 실패했습니다." 
-          })
-        }
-        return
+  
+      if (result.success) {
+        // 회원가입 성공
+        toast.success("회원가입이 완료되었습니다!", {
+          description: "로그인 페이지로 이동합니다.",
+        })
+        
+        // 로그인 페이지로 이동
+        setTimeout(() => {
+          router.push("/auth/signin")
+        }, 1500)
+      } else {
+        toast.error("회원가입에 실패하였습니다.")
       }
-
-      // 회원가입 성공
-      toast.success("회원가입이 완료되었습니다!", {
-        description: "로그인 페이지로 이동합니다.",
-      })
-      
-      // 로그인 페이지로 이동
-      setTimeout(() => {
-        router.push("/auth/signin")
-      }, 1500)
     } catch (error) {
       setError("root", { 
         type: "manual", 

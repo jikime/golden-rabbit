@@ -1,7 +1,7 @@
 "use client"
 
 import { useChat } from '@ai-sdk/react'
-import { DefaultChatTransport } from 'ai'
+import { TextStreamChatTransport } from 'ai'
 import { useState } from 'react'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -16,7 +16,7 @@ interface ChatInterfaceProps {
 
 export function ChatInterface({ onOpenSidebar }: ChatInterfaceProps) {
   const { messages, sendMessage, status } = useChat({
-    transport: new DefaultChatTransport({
+    transport: new TextStreamChatTransport({
       api: '/api/chat',
     }),
   })
