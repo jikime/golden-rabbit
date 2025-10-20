@@ -3,12 +3,13 @@ import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Card } from "@/components/ui/card"
 import { MessageCircle, Plus, X } from "lucide-react"
+import { useEffect, useState } from "react"
+import { toast } from "sonner"
+import { useRouter } from "next/navigation"
 
 interface Conversation {
-  id: string
+  id: number
   title: string
-  lastMessage: string
-  timestamp: Date
 }
 
 interface ChatSidebarProps {
@@ -19,39 +20,58 @@ interface ChatSidebarProps {
 }
 
 export function ChatSidebar({ isOpen, onClose, selectedConversation, onSelectConversation }: ChatSidebarProps) {
-  // Mock data
-  const conversations: Conversation[] = [
-    {
-      id: "1",
-      title: "React 프로젝트 도움",
-      lastMessage: "컴포넌트 구조에 대해 설명해드렸습니다.",
-      timestamp: new Date(),
-    },
-    {
-      id: "2",
-      title: "여행 계획 세우기",
-      lastMessage: "제주도 3박 4일 일정을 추천해드렸습니다.",
-      timestamp: new Date(Date.now() - 1800000),
-    },
-    {
-      id: "3",
-      title: "요리 레시피 문의",
-      lastMessage: "간단한 파스타 레시피를 알려드렸습니다.",
-      timestamp: new Date(Date.now() - 3600000),
-    },
-    {
-      id: "4",
-      title: "영어 학습 방법",
-      lastMessage: "효과적인 영어 공부법을 제안해드렸습니다.",
-      timestamp: new Date(Date.now() - 7200000),
-    },
-    {
-      id: "5",
-      title: "운동 루틴 추천",
-      lastMessage: "홈트레이닝 프로그램을 만들어드렸습니다.",
-      timestamp: new Date(Date.now() - 86400000),
-    },
-  ]
+  const [conversations, setConversations] = useState<Conversation[]>([])
+  const [loading, setLoading] = useState(true)
+  const router = useRouter()
+
+  useEffect(() => {
+    const fetchConversations = async () => {
+      try {
+        const response = await fetch('/api/conversations')
+        if (response.ok) {
+          const data = await response.json()
+          setConversations(data)
+        } else {
+          console.error('대화 목록을 가져오는데 실패했습니다.')
+        }
+      } catch (error) {
+        console.error('API 호출 중 오류:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchConversations()
+  }, [])
+
+  const handleNewConversation = async () => {
+    try {
+      const response = await fetch('/api/conversations', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ title: '새 대화' }),
+      })
+
+      if (response.ok) {
+        const newConversation = await response.json()
+        // 대화 목록을 다시 불러와서 화면 갱신
+        const listResponse = await fetch('/api/conversations')
+        if (listResponse.ok) {
+          const updatedConversations = await listResponse.json()
+          setConversations(updatedConversations)
+          // 새로 생성된 대화를 선택
+          onSelectConversation(newConversation.id.toString())
+        }
+      } else {
+        toast.error('대화 생성에 실패했습니다.')
+      }
+    } catch (error) {
+      console.error('API 호출 중 오류:', error)
+      toast.error('대화 생성에 실패했습니다.')
+    }
+  }
 
   return (
     <>
@@ -80,6 +100,7 @@ export function ChatSidebar({ isOpen, onClose, selectedConversation, onSelectCon
             <Button
               className="w-full justify-start gap-2 bg-primary hover:bg-primary/90 text-primary-foreground"
               variant="outline"
+              onClick={handleNewConversation}
             >
               <Plus className="h-4 w-4" />새 대화 시작하기
             </Button>
@@ -88,31 +109,37 @@ export function ChatSidebar({ isOpen, onClose, selectedConversation, onSelectCon
           {/* Conversations List */}
           <ScrollArea className="flex-1 px-4">
             <div className="space-y-2">
-              {conversations.map((conversation) => (
-                <Card
-                  key={conversation.id}
-                  className={`p-3 cursor-pointer transition-colors hover:bg-sidebar-accent ${
-                    selectedConversation === conversation.id
-                      ? "bg-sidebar-accent border-sidebar-primary"
-                      : "border-sidebar-border"
-                  }`}
-                  onClick={() => onSelectConversation(conversation.id)}
-                >
-                  <div className="flex items-start gap-3">
-                    <MessageCircle className="h-4 w-4 mt-1 text-sidebar-primary flex-shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-medium text-sm text-sidebar-foreground truncate">{conversation.title}</h3>
-                      <p className="text-xs text-sidebar-foreground/70 mt-1 line-clamp-2">{conversation.lastMessage}</p>
-                      <p className="text-xs text-sidebar-foreground/50 mt-1">
-                        {conversation.timestamp.toLocaleTimeString("ko-KR", {
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </p>
+              {loading ? (
+                <div className="text-center py-4 text-sidebar-foreground/70">
+                  대화 목록을 불러오는 중...
+                </div>
+              ) : conversations.length === 0 ? (
+                <div className="text-center py-4 text-sidebar-foreground/70">
+                  아직 대화가 없습니다.
+                </div>
+              ) : (
+                conversations.map((conversation) => (
+                  <Card
+                    key={conversation.id}
+                    className={`p-3 cursor-pointer transition-colors hover:bg-sidebar-accent ${
+                      selectedConversation === conversation.id.toString()
+                        ? "bg-sidebar-accent border-sidebar-primary"
+                        : "border-sidebar-border"
+                    }`}
+                    onClick={() => {
+                      router.push(`/?id=${conversation.id}`)
+                      onSelectConversation(conversation.id.toString())
+                    }}
+                  >
+                    <div className="flex items-start gap-3">
+                      <MessageCircle className="h-4 w-4 mt-1 text-sidebar-primary flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-medium text-sm text-sidebar-foreground truncate">{conversation.title}</h3>
+                      </div>
                     </div>
-                  </div>
-                </Card>
-              ))}
+                  </Card>
+                ))
+              )}
             </div>
           </ScrollArea>
         </div>
